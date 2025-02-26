@@ -19,10 +19,10 @@ export class AiService{
         this.systemPrompt = this.configService.get<string>("SYSTEM_PROMPT", "")
         this.userPrompt = this.configService.get<string>("USER_PROMPT", "")
 
-        const width = this.configService.get<string>("WIDTH", "512")  
+        const width = this.configService.get<string>("MAX_WIDTH", "512")  
         this.width_default = parseInt(width)
 
-        const height = this.configService.get<string>("HEIGHT", "512")
+        const height = this.configService.get<string>("MAX_HEIGHT", "512")
         this.height_default = parseInt(height)
     }
 
@@ -36,10 +36,38 @@ export class AiService{
             const format = matches[1]; 
             const buffer = Buffer.from(matches[2], 'base64');
 
+            // #region Aspect Ratio resizeing
+            const metadata = await sharp(buffer).metadata();
+            let width = this.width_default;
+            let height = this.height_default;
+
+            if (metadata.width && metadata.height) {
+                const aspectRatio = metadata.width / metadata.height;
+                
+                if (aspectRatio > 1) {
+                  width = this.width_default;
+                  height = Math.floor(width / aspectRatio);
+                  
+                  if (height > this.height_default) {
+                    height = this.height_default;
+                    width = Math.floor(height * aspectRatio);
+                  }
+                } else {
+                  height = this.height_default;
+                  width = Math.floor(height * aspectRatio);
+                  
+                  if (width > this.width_default) {
+                    width = this.width_default;
+                    height = Math.floor(width / aspectRatio);
+                  }
+                }
+              }
+            //   #endregion
+
             const resizedBuffer = await sharp(buffer)
                                             .resize(
-                                                this.width_default, 
-                                                this.height_default)
+                                                width, 
+                                                height)
                                             .toBuffer()
 
             const resizedBase64 = `data:image/${format};base64,${resizedBuffer.toString('base64')}`;
@@ -85,7 +113,11 @@ export class AiService{
                 throw new BadRequestException('AI returned an invalid or empty response');
             }
 
-            return response.choices[0].message.content;
+            let aiResponse = response.choices[0].message.content;
+            aiResponse = aiResponse.replaceAll("`", "")
+            aiResponse = aiResponse.substring(4)
+
+            return aiResponse 
         } catch(error) {
             throw new BadRequestException(`AI processing error: ${error.message || 'Unknown error'}`);
         }
