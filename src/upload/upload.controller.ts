@@ -101,19 +101,23 @@ export class UploadController {
       console.log(aiResponse)
 
       let uploadDtoAttributes = this.recurseParseObj(uploadDto, ["title", "description", "imageBase64"])
-      console.log(uploadDtoAttributes)
       let aiResponseAttributes = this.recurseParseObj(aiResponseObj, [], [], "xArtistsAI")
       const atributes = [...uploadDtoAttributes, ...aiResponseAttributes]
-      console.log(uploadDtoAttributes)
-      console.log(atributes)
 
       const metadata = {
         title: uploadDto.title,
         description: uploadDto.description,
         atributes: atributes
       }
+
+      let randImageName = "";
+      const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const charactersLength = characters.length;
+      for ( let i = 0; i < length; i++ ) {
+          randImageName+= characters.charAt(Math.floor(Math.random() * charactersLength));
+      }
  
-      const imageName = `image.${imageFormat}`;
+      const imageName = `${randImageName}.${imageFormat}`;
       const imageHash = await this.ipfsService.uploadFile(imageBuffer, imageName);
       const metadataHash = await this.ipfsService.uploadMetadata(metadata);
       
