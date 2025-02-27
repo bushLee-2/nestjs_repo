@@ -1,10 +1,8 @@
-// First, ensure IpfsService is exported with @Injectable()
 import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IpfsService } from './ipfs.service';
 import { UploadDto } from './dto/upload.dto';
 import { AiService } from './ai.service';
-import { time } from 'console';
 
 
 interface IpfsUploadResult {
@@ -12,23 +10,9 @@ interface IpfsUploadResult {
   imageUrl: string;
 }
 
-interface AiAnalysis {
-  style_recognition: string;
-  color_palette: string;
-  composition_analysis_balance: string;
-  composition_analysis_focus: string;
-  unique_features: string;
-}
-
 interface Attribute {
   trait_type: string;
   value: any;
-}
-
-interface Metadata {
-  title: string;
-  description: string;
-  atributes: Attribute[];
 }
 
 
