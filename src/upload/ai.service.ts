@@ -87,7 +87,7 @@ export class AiService{
         try {
             const openai = new OpenAI()
             let userPrompt = "" 
-            if (!hasPhysicalAsset) {
+            if (hasPhysicalAsset) {
                 userPrompt = this.userPrompt
             }
 
@@ -101,7 +101,7 @@ export class AiService{
                 {
                     role: "user",
                     content: [
-                    { type: "text", text: this.userPrompt},
+                    { type: "text", text: userPrompt},
                     {
                         type: "image_url",
                         image_url: {
