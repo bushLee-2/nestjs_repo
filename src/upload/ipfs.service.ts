@@ -31,7 +31,6 @@ export class IpfsService {
       });
       
       // Return the IPFS hash
-      console.log(response.data)
       return response.data.IpfsHash;
     } catch (error) {
       throw new BadRequestException(`IPFS upload failed: ${error.message}`);
