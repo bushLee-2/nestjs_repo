@@ -10,7 +10,7 @@ export class IpfsService {
   private readonly pinningServiceApiKey: string;
 
   constructor(private configService: ConfigService) {
-    this.ipfsGateway = this.configService.get<string>('IPFS_GATEWAY', 'https://gateway.ipfs.io/ipfs');
+    this.ipfsGateway = this.configService.get<string>('IPFS_GATEWAY', 'https://ipfs.io/ipfs');
     
     this.pinningServiceUrl = this.configService.get<string>('PINATA_API_URL', 'https://api.pinata.cloud/pinning');
     this.pinningServiceApiKey = this.configService.get<string>('PINATA_JWT', '');

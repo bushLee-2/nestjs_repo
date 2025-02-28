@@ -114,9 +114,13 @@ export class MultiversxService {
   async getUpdateInteraction(
     nftIdentifier: string,
     newMetadataUrl: string,
+    rawNft: any,
   ): Promise<Interaction> {
     const newMetadataCID = newMetadataUrl.split('/').pop();
-    const nftOnNetwork = await this.getNftByIdentifier(nftIdentifier);
+    const nftOnNetwork = rawNft;
+
+    console.log('Nft on network, sending tx', nftOnNetwork);
+
     const previousAttributes = nftOnNetwork.attributes.toString('utf8');
     // tags:xArtists,AIMegaWaveHackathon;metadata:bafkreibngetnjgfzrq2ovxw7ek745rk6vz34y23yxjau3qgpxcwltvdq7a
     const newAttributes =
@@ -142,10 +146,11 @@ export class MultiversxService {
       .withGasLimit(20_000_000);
   }
 
-  async sendUpdateTx(nftIdentifier: string, newMetadataUrl: string) {
+  async sendUpdateTx(nftIdentifier: string, newMetadataUrl: string, rawNft: any) {
     const interaction = await this.getUpdateInteraction(
       nftIdentifier,
       newMetadataUrl,
+      rawNft,
     );
     return this.signAndSendTx(interaction);
   }
