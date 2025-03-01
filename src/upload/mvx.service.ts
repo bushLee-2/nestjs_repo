@@ -73,14 +73,16 @@ export class MultiversxService {
   }
 
   async signAndSendTx(txInteraction: Interaction) {
+    console.log('Signing and sending tx');
     let tx = txInteraction
       .withChainID(this.networkCfg.chain)
       .withSender(this.backendAccount.address)
       .buildTransaction();
 
     tx.setNonce(this.backendAccount.getNonceThenIncrement());
+    console.log('Sending tx');
     let txResult = await this.signAndSendExplicit(tx);
-
+    console.log('Tx sent');
     return (
       !txResult.status.isFailed() &&
       !txResult.status.isInvalid() &&
@@ -114,38 +116,61 @@ export class MultiversxService {
   async getUpdateInteraction(
     nftIdentifier: string,
     newMetadataUrl: string,
+    rawNft: any,
   ): Promise<Interaction> {
     const newMetadataCID = newMetadataUrl.split('/').pop();
-    const nftOnNetwork = await this.getNftByIdentifier(nftIdentifier);
-    const previousAttributes = nftOnNetwork.attributes.toString('utf8');
+    const nftOnNetwork = rawNft;
+
+    console.log('Nft on network, sending tx', nftOnNetwork);
+
+    const previousAttributes = Buffer.from(
+      nftOnNetwork.attributes,
+      'base64',
+    ).toString('utf8');
     // tags:xArtists,AIMegaWaveHackathon;metadata:bafkreibngetnjgfzrq2ovxw7ek745rk6vz34y23yxjau3qgpxcwltvdq7a
     const newAttributes =
       previousAttributes
         .split(';')
         .filter((attr) => !attr.includes('metadata'))
-        .join(';') + `;metadata=${newMetadataCID}`;
+        .join(';') + `;metadata:${newMetadataCID}`;
 
     const contract = new SmartContract({
       address: new Address(this.escrowContractAddress),
       abi: this.escrowContractAbi,
     });
 
-    return contract.methods
-      .update([
-        nftOnNetwork.nonce,
-        nftOnNetwork.name,
-        nftOnNetwork.royalties,
-        newAttributes,
-        nftOnNetwork.assets[0],
-        newMetadataUrl,
-      ])
-      .withGasLimit(20_000_000);
+    const oldImgUri = Buffer.from(nftOnNetwork.uris[0], 'base64').toString(
+      'utf8',
+    );
+
+    try {
+      const interaction = contract.methods
+        .update([
+          nftOnNetwork.nonce,
+          nftOnNetwork.name,
+          nftOnNetwork.royalties ?? 0,
+          // nftOnNetwork.hash,
+          newAttributes,
+          oldImgUri,
+          // newMetadataUrl,
+        ])
+        .withGasLimit(20_000_000);
+      return interaction;
+    } catch (error) {
+      console.log('Error', error);
+      throw error;
+    }
   }
 
-  async sendUpdateTx(nftIdentifier: string, newMetadataUrl: string) {
+  async sendUpdateTx(
+    nftIdentifier: string,
+    newMetadataUrl: string,
+    rawNft: any,
+  ) {
     const interaction = await this.getUpdateInteraction(
       nftIdentifier,
       newMetadataUrl,
+      rawNft,
     );
     return this.signAndSendTx(interaction);
   }
