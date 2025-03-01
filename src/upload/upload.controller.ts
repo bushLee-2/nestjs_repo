@@ -161,11 +161,9 @@ export class UploadController {
       const atributes = [...uploadDtoAttributes, ...aiResponseAttributes]
       // #endregion
 
-
       const metadata = {
         title: uploadDto.title,
         description: uploadDto.description,
-        url: this.ipfsService.getIpfsUrl(imageHash),  
         attributes: atributes
       }
 
@@ -207,11 +205,12 @@ export class UploadController {
       const oldResizedImageBuffer = await this.aiService.resizeBase64Image(oldImageBase64)  
       // #endregion
 
-      const aiResponse = await this.aiService.aiReassesImage(resizedImageBuffer, JSON.stringify(oldMetadata), oldResizedImageBuffer);
+      const unixTimestamp: number = Math.floor(Date.now() / 1000);
+      const aiResponse = await this.aiService.aiReassesImage(resizedImageBuffer, JSON.stringify(oldMetadata), oldResizedImageBuffer, unixTimestamp);
       const aiResponseObj = JSON.parse(aiResponse)
 
       let reassesAttributes = this.recurseParseObj(aiResponseObj, [], [], "xArtistsAI")  
-      oldMetadata.attributes = [...oldMetadata.attributes, ...reassesAttributes]
+      oldMetadata.attributes = [...oldMetadata.attributes, ...reassesAttributes, {trait_type: `xArtistsAI_assessment_${unixTimestamp}_image_url`, value: this.ipfsService.getIpfsUrl(aiResponseObj.image)}]
       console.log("Reassesed atributes\n", reassesAttributes)
       console.log("Metadata", oldMetadata)
 
