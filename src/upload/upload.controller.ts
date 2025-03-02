@@ -230,7 +230,7 @@ export class UploadController {
       const metadata = {
         title: uploadDto.title,
         description: uploadDto.description,
-        url: this.ipfsService.getIpfsUrl(imageHash),
+        // url: this.ipfsService.getIpfsUrl(imageHash),
         attributes: atributes,
       };
 
@@ -289,25 +289,17 @@ export class UploadController {
         await this.aiService.resizeBase64Image(oldImageBase64);
       // #endregion
 
+      const unixTimestamp: number = Math.floor(Date.now() / 1000);
+
       const aiResponse = await this.aiService.aiReassesImage(
         resizedImageBuffer,
         JSON.stringify(oldMetadata),
         oldResizedImageBuffer,
+        unixTimestamp,
       );
       const aiResponseObj = JSON.parse(aiResponse);
 
-      let reassesAttributes = this.recurseParseObj(
-        aiResponseObj,
-        [],
-        [],
-        'xArtistsAI',
-      );
-      oldMetadata.attributes = [
-        ...oldMetadata.attributes,
-        ...reassesAttributes,
-      ];
-      console.log('Reassesed atributes\n', reassesAttributes);
-      console.log('Metadata', oldMetadata);
+      
 
       let randImageName = '';
       const characters =
@@ -324,6 +316,24 @@ export class UploadController {
         imageBuffer,
         imageName,
       );
+
+      let reassesAttributes = this.recurseParseObj(
+        aiResponseObj,
+        [],
+        [],
+        'xArtistsAI',
+      );
+      oldMetadata.attributes = [
+        ...oldMetadata.attributes,
+        ...reassesAttributes,
+        {
+          trait_type: `xArtistsAI_assessment_${unixTimestamp}_image_url`,
+          value: this.ipfsService.getIpfsUrl(imageHash),
+        },
+      ];
+      console.log('Reassesed atributes\n', reassesAttributes);
+      console.log('Metadata', oldMetadata);
+
       const metadataHash = await this.ipfsService.uploadMetadata(oldMetadata);
 
       await this.mvxService.updateInternalAccount();
