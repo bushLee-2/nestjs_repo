@@ -8,9 +8,9 @@ export enum JobStatus {
 export class Job {
   id: string;
   fn: Function;
-  parameters?: any;
+  parameters?: any[];
   status: JobStatus;
-  dependsOn?: string | string[];
+  dependsOn?: string[];
   result?: any;
   error?: string;
   clientId: string;

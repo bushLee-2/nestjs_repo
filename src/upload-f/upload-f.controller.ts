@@ -19,84 +19,51 @@ export class UploadFController {
     const processImgId = uuidv4();
     const processImgJob: Job = {
       id: processImgId,
-      fn: this.utilsService.processImage,
-      parameters: uploadDto.imageBase64,
+      fn: this.processImage,
+      parameters: [uploadDto.imageBase64, uploadDto.hasPhysicalAsset],
       status: JobStatus.PENDING,
       clientId: uploadDto.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Job;
 
-    const aiAssesmentId: string = uuidv4();
-    const aiAssesmentJob = {
-      id: aiAssesmentId,
-      fn: this.aiService.aiProcessImage,
-      // parameters:
-      status: JobStatus.PENDING,
+    const uploadDataId = uuidv4();
+    const uploadData: Job = {
+      id: uploadDataId,
+      fn: this.uploadData,
+      parameters: uploadDto,
       dependsOn: processImgId,
-      clientId: uploadDto.clientID,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Job;
-
-    const uploadImageId: string = uuidv4();
-    const uploadImageJob = {
-      id: uploadImageId,
-      fn: this.ipfsService.uploadFile,
-      parameters: [],
       status: JobStatus.PENDING,
-      dependsOn: [aiAssesmentId, processImgJob],
       clientId: uploadDto.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Job;
-
-    const generateMetadataId = uuidv4();
-    const generateMetadataJob = {
-      id: generateMetadataId,
-      fn: this.utilsService.generateMetadata,
-      // parameters:
-      status: JobStatus.PENDING,
-      dependsOn: [uploadImageJob, aiAssesmentId],
-      clientId: uploadDto.clientID,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Job;
-
-    const uploadMetadataId: string = uuidv4();
-    const uploadMetadataJob = {
-      id: uploadMetadataId,
-      fn: this.ipfsService.uploadMetadata,
-      // parameters:
-      status: JobStatus.PENDING,
-      dependsOn: generateMetadataId,
-      clientId: uploadDto.clientID,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Job;
-
     // 	TODO: add all these to a queue
-    const jobs = [
-      processImgJob,
-      aiAssesmentId,
-      uploadImageJob,
-      generateMetadataJob,
-      uploadMetadataJob,
-    ];
+    const jobs = [processImgJob];
   }
 
-  private async processImage(imageBase64: string, hasPhysicalAsset: boolean)  {
-      const image = await this.utilsService.processImage(imageBase64)
-      const aiResponse  = await this.aiService.aiProcessImage(image, hasPhysicalAsset)
-      return {image, aiResponse};
+  private async processImage(imageBase64: string, hasPhysicalAsset: boolean) {
+    const image = await this.utilsService.processImage(imageBase64);
+    const aiResponse = await this.aiService.aiProcessImage(
+      image,
+      hasPhysicalAsset,
+    );
+    return { image, aiResponse };
   }
 
-  private async uploadData(uploadDTO: UploadDto, resizedImage: string, aiResponse: any) {
+  private async uploadData(
+    uploadDTO: UploadDto,
+    resizedImage: string,
+    aiResponse: any,
+  ) {
     const ipfsHash = await this.ipfsService.uploadFile(
-      Buffer.from(resizedImage, 'base64'), this.utilsService.genRandImgName()
-    )
+      Buffer.from(resizedImage, 'base64'),
+      this.utilsService.genRandImgName(),
+    );
     const metadata = this.utilsService.generateMetadata(
-      uploadDTO, aiResponse, ipfsHash
-    )
+      uploadDTO,
+      aiResponse,
+      ipfsHash,
+    );
   }
 }

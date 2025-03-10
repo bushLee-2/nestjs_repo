@@ -6,65 +6,98 @@ export class JobService {
   private jobQueue: Job[] = [];
   private jobMap = new Map<string, Job>();
   private jobDependencies = new Map<string, string[]>();
-  private jobResults = new Map<string, any>;
   private isProcessing = false;
 
   public async enqueueJob(job: Job): Promise<void> {
     this.jobQueue.push(job);
     this.jobMap.set(job.id, job);
-
-    if (Array.isArray(job.dependsOn)) {
-      for (const dependentJob in job.dependsOn) {
-        this.jobDependencies[job.id].append(dependentJob);
-      }
-    } else {
-      this.jobDependencies[job.id].append(job.dependsOn);
+    if (job.dependsOn) {
+      this.jobDependencies.set(job.id, job.dependsOn);
     }
+    //   TODO: send ws message that it was queued
 
     if (!this.isProcessing) {
       this.processQueue();
     }
   }
 
-  public async enqueueBatchJob(job: Job): Promise<void> {}
-
   private async processQueue() {
-    if (!this.isProcessing) {
-      return;
-    }
-
     try {
       while (this.jobQueue.length > 0) {
-        const job = this.jobQueue.shift();
+        const job: Job = this.jobQueue.shift();
         await this.processJob(job);
       }
-    } catch (error) {}
-  }
-
-  private async processJob(job: Job): Promise<void> {
-    try {
-      // Update job status to processing
-      job.status = JobStatus.PROCESSING;
-      job.updatedAt = new Date();
-      // this.notifyClient(job);
-      if (!job.parameters) {
-      }
-      const result = await job.fn();
-
-      // Update job status to completed
-      job.status = JobStatus.COMPLETED;
-      job.updatedAt = new Date();
-      // this.notifyClient(job);
-
-      console.log(`Job completed: ${job.id}`);
     } catch (error) {
-      console.error(`Job failed: ${job.id}`, error.stack);
-
-      // Update job status to failed
-      job.status = JobStatus.FAILED;
-      job.error = error.message;
-      job.updatedAt = new Date();
-      // this.notifyClient(job);
+      //   TODO: send ws message with error here ?
+    } finally {
+      this.isProcessing = false;
     }
   }
+
+  private async processJob(job: Job) {
+    // region Check if any of the dependecies failed
+    if (job.dependsOn && job.dependsOn.length > 0) {
+      for (const debJobId of job.dependsOn) {
+        if (this.jobMap.get(debJobId).status === JobStatus.FAILED) {
+          job.status = JobStatus.FAILED;
+          throw new Error(
+            `Job ID ${debJobId} failed with status ${this.jobMap[debJobId].error}`,
+          );
+        }
+      }
+    }
+    // endregion
+
+    try {
+      job.status = JobStatus.PROCESSING;
+      job.updatedAt = new Date();
+
+      // region Job dependecies
+      if (job.dependsOn && job.dependsOn.length > 0) {
+        let allDependeciesResolved: boolean = true;
+        for (const debJobId of job.dependsOn) {
+          if (this.jobMap.get(debJobId).status !== JobStatus.COMPLETED) {
+            allDependeciesResolved = false;
+            break;
+          }
+        }
+
+        if (allDependeciesResolved) {
+          const results = []
+          for (const debJobId of job.dependsOn) {
+            let result = this.jobMap.get(debJobId).result;
+            results.push(...result);
+          }
+          const jobResult = await job.fn(...job.parameters, ...results);
+          job.result = jobResult;
+          job.status = JobStatus.COMPLETED;
+          this.cleanJobMap(job.id)
+        } else {
+          this.jobQueue.push(job);
+        }
+        //   endregion
+      } else {
+        job.result = await job.fn(...job.parameters);
+        job.status = JobStatus.COMPLETED;
+        //   Delete job from map if there are no dependencies for it
+        this.cleanJobMap(job.id)
+      }
+    } catch (error) {
+      job.error = error.message;
+      job.status = JobStatus.FAILED;
+    }
+  }
+
+  private cleanJobMap(jobToCheck: string) {
+    let toDelete = true;
+    for (const [_, job] of this.jobMap.entries()) {
+      if (job.dependsOn && job.dependsOn.includes(jobToCheck)) {
+        toDelete = false;
+        break;
+      }
+    }
+
+    if (toDelete) {
+      this.jobMap.delete(jobToCheck);
+    }}
 }
