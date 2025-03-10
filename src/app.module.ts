@@ -10,14 +10,20 @@ import { UtilsService } from './upload/utils.service';
 import { JobService } from './upload/queue.service';
 
 @Module({
-  imports: [ConfigModule.forRoot({
-    // isGlobal: true,
-    envFilePath: ".env"
-  })],
-  controllers: [
-    AppController,
-    UploadController,
+  imports: [
+    ConfigModule.forRoot({
+      // isGlobal: true,
+      envFilePath: '.env',
+    }),
   ],
-  providers: [AppService, IpfsService, AiService, UtilsService, JobService, MultiversxService],
+  controllers: [AppController, UploadController],
+  providers: [
+    AppService,
+    IpfsService,
+    AiService,
+    UtilsService,
+    JobService,
+    MultiversxService,
+  ],
 })
 export class AppModule {}

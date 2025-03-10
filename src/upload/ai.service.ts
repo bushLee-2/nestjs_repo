@@ -1,7 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import * as sharp from 'sharp';
 
 @Injectable()
 export class AiService {
@@ -12,9 +11,6 @@ export class AiService {
 
   private readonly reassesmentSystemPrompt: string;
   private readonly reassesmentUserPrompt: string;
-
-  private readonly width_default: number;
-  private readonly height_default: number;
 
   constructor(private configService: ConfigService) {
     this.aiServiceApiKey = this.configService.get<string>('OPENAI_API_KEY', '');
@@ -30,12 +26,6 @@ export class AiService {
       'REASSESSMENT_USER_PROMPT',
       '',
     );
-
-    const width = this.configService.get<string>('MAX_WIDTH', '512');
-    this.width_default = parseInt(width);
-
-    const height = this.configService.get<string>('MAX_HEIGHT', '512');
-    this.height_default = parseInt(height);
   }
 
   public async aiProcessImage(
@@ -79,9 +69,7 @@ export class AiService {
         !response.choices[0].message ||
         !response.choices[0].message.content
       ) {
-        throw new BadRequestException(
-          'AI returned an invalid or empty response',
-        );
+        throw new Error('Invalid ai response');
       }
 
       let aiResponse = response.choices[0].message.content;
@@ -90,7 +78,7 @@ export class AiService {
 
       return aiResponse;
     } catch (error) {
-      throw new BadRequestException(
+      throw new Error(
         `AI processing error: ${error.message || 'Unknown error'}`,
       );
     }
@@ -150,9 +138,7 @@ export class AiService {
         !response.choices[0].message ||
         !response.choices[0].message.content
       ) {
-        throw new BadRequestException(
-          'AI returned an invalid or empty response',
-        );
+        throw new Error('AI returned an invalid or empty response');
       }
 
       let aiResponse = response.choices[0].message.content;
@@ -161,7 +147,7 @@ export class AiService {
 
       return aiResponse;
     } catch (error) {
-      throw new BadRequestException(
+      throw new Error(
         `AI processing error: ${error.message || 'Unknown error'}`,
       );
     }

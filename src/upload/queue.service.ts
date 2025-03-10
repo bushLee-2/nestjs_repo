@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Job, JobStatus } from './interfaces/job.interface';
 
 @Injectable()
 export class JobService {
+  private readonly logger = new Logger(JobService.name);
   private jobQueue: Job[] = [];
   private jobMap = new Map<string, Job>();
   private jobDependencies = new Map<string, string[]>();
@@ -11,12 +12,15 @@ export class JobService {
   public async enqueueJob(job: Job): Promise<void> {
     this.jobQueue.push(job);
     this.jobMap.set(job.id, job);
-    if (job.dependsOn) {
-      this.jobDependencies.set(job.id, job.dependsOn);
+
+    if (job.dependsOn && job.dependsOn.length > 0) {
+      this.jobDependencies.set(job.id, [...job.dependsOn]); // Use spread operator to clone array
     }
-    //   TODO: send ws message that it was queued
+
+    // TODO: send ws message that it was queued
 
     if (!this.isProcessing) {
+      this.isProcessing = true; // Set flag before starting processing
       this.processQueue();
     }
   }
@@ -24,88 +28,125 @@ export class JobService {
   private async processQueue() {
     try {
       while (this.jobQueue.length > 0) {
-        // @ts-ignore
-        const job: Job = this.jobQueue.shift();
+        const job = this.jobQueue.shift();
+        if (!job) continue;
+
         await this.processJob(job);
       }
     } catch (error) {
-      // throw new Error(error);
-      //   TODO: send ws message with error here ?
+      this.logger.error(
+        `Error processing job queue: ${error.message}`,
+        error.stack,
+      );
+      // TODO: send ws message with error here
     } finally {
       this.isProcessing = false;
     }
   }
 
   private async processJob(job: Job) {
-    // region Check if any of the dependecies failed
-    if (job.dependsOn && job.dependsOn.length > 0) {
-      for (const debJobId of job.dependsOn) {
-        // @ts-ignore
-        if (this.jobMap.get(debJobId).status === JobStatus.FAILED) {
-          // TODO: Fail the entire dependecy chain and clean it ?
-          job.status = JobStatus.FAILED;
-          throw new Error(
-            `Job ID ${debJobId} failed with status ${this.jobMap[debJobId].error}`,
-          );
-        }
-      }
-    }
-    // endregion
-
     try {
+      // Update job status
       job.status = JobStatus.PROCESSING;
       job.updatedAt = new Date();
 
-      // region Job dependecies
+      // Check if any dependencies failed
+      if (job.dependsOn && job.dependsOn.length > 0) {
+        for (const depJobId of job.dependsOn) {
+          const depJob = this.jobMap.get(depJobId);
+          if (!depJob) {
+            throw new Error(`Dependency job ID ${depJobId} not found`);
+          }
 
-      if (job.dependsOn.length > 0) {
-        let allDependeciesResolved: boolean = true;
-        for (const debJobId of job.dependsOn) {
-          // @ts-ignore
-          if (this.jobMap.get(debJobId).status !== JobStatus.COMPLETED) {
-            allDependeciesResolved = false;
-            break;
+          if (depJob.status === JobStatus.FAILED) {
+            throw new Error(
+              `Dependency job ID ${depJobId} failed with error: ${depJob.error}`,
+            );
           }
         }
 
-        if (allDependeciesResolved) {
-          const results:any = [];
-          for (const debJobId of job.dependsOn) {
-            // @ts-ignore
-            const result = this.jobMap.get(debJobId).result;
-            results.push(...result);
-          }
-          const jobResult = await job.fn(...(job.parameters || []), ...results);
+        // Check if all dependencies are completed
+        const allDependenciesResolved = job.dependsOn.every(
+          (depJobId) =>
+            this.jobMap.get(depJobId)?.status === JobStatus.COMPLETED,
+        );
+
+        if (allDependenciesResolved) {
+          // Collect results from dependencies
+          const depResults = job.dependsOn.map(
+            (depJobId) => this.jobMap.get(depJobId)?.result,
+          );
+
+          // Execute the job function with parameters and dependency results
+          const jobResult = await job.fn(
+            ...(job.parameters || []),
+            ...depResults,
+          );
           job.result = jobResult;
           job.status = JobStatus.COMPLETED;
+          job.updatedAt = new Date();
+
+          // Clean up job map if no other jobs depend on this one
           this.cleanJobMap(job.id);
         } else {
+          // Re-queue the job if dependencies aren't all completed
           this.jobQueue.push(job);
+          return; // Exit early to avoid marking as complete
         }
-        //   endregion
       } else {
+        // No dependencies, execute directly
         job.result = await job.fn(...(job.parameters || []));
         job.status = JobStatus.COMPLETED;
-        //   Delete job from map if there are no dependencies for it
+        job.updatedAt = new Date();
+
+        // Clean up if no other jobs depend on this one
         this.cleanJobMap(job.id);
       }
+
+      // TODO: Send websocket message about job completion
     } catch (error) {
       job.error = error.message;
       job.status = JobStatus.FAILED;
+      job.updatedAt = new Date();
+      this.logger.error(`Job ${job.id} failed: ${error.message}`, error.stack);
+
+      // TODO: Send websocket message about job failure
+
+      // Mark dependent jobs as failed
+      this.failDependentJobs(job.id);
     }
   }
 
-  private cleanJobMap(jobToCheck: string) {
-    let toDelete = true;
-    for (const [_, job] of this.jobMap.entries()) {
-      if (job.dependsOn && job.dependsOn.includes(jobToCheck)) {
-        toDelete = false;
+  private failDependentJobs(failedJobId: string) {
+    // Find all jobs that depend on the failed job
+    for (const [jobId, deps] of this.jobDependencies.entries()) {
+      if (deps.includes(failedJobId)) {
+        const job = this.jobMap.get(jobId);
+        if (job && job.status !== JobStatus.FAILED) {
+          job.status = JobStatus.FAILED;
+          job.error = `Dependency job ${failedJobId} failed`;
+          job.updatedAt = new Date();
+
+          // Recursively fail jobs that depend on this one
+          this.failDependentJobs(jobId);
+        }
+      }
+    }
+  }
+
+  private cleanJobMap(jobId: string) {
+    // Check if any other jobs depend on this one
+    let canDelete = true;
+    for (const deps of this.jobDependencies.values()) {
+      if (deps.includes(jobId)) {
+        canDelete = false;
         break;
       }
     }
 
-    if (toDelete) {
-      this.jobMap.delete(jobToCheck);
+    if (canDelete) {
+      this.jobMap.delete(jobId);
+      this.jobDependencies.delete(jobId);
     }
   }
 }

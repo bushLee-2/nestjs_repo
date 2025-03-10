@@ -10,7 +10,7 @@ export class Job {
   fn: Function;
   parameters: any[] = [];
   status: JobStatus;
-  dependsOn: string[]=[];
+  dependsOn: string[] = [];
   result?: any;
   error?: string;
   // TODO: remove the "?"

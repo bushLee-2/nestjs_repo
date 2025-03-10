@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as sharp from 'sharp';
 import { UploadDto } from './dto/uploadDto';
@@ -23,7 +23,7 @@ export class UtilsService {
     );
   }
 
-  // region imageProcessing for AI
+  // region imageProcessing
   public async processImage(imageBase64: string): Promise<string> {
     try {
       const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -46,7 +46,7 @@ export class UtilsService {
     try {
       const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
       if (!matches) {
-        throw new BadRequestException('Invalid base64 image format');
+        throw new Error('Invalid base64 image format');
       }
       const format = matches[1];
       const buffer = Buffer.from(matches[2], 'base64');
@@ -91,7 +91,6 @@ export class UtilsService {
       throw new Error('Resizing image failed with error:' + error.message);
     }
   }
-  // 	endregion
 
   public genRandImgName(len: number = 16): string {
     let result = '';
@@ -103,6 +102,7 @@ export class UtilsService {
 
     return result;
   }
+  // 	endregion
 
   // 	region Metadata generation
   public generateMetadata(

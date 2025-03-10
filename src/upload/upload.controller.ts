@@ -16,6 +16,7 @@ export class UploadController {
     private readonly jobService: JobService,
   ) {}
 
+  // region Upload
   @Post()
   async upload(@Body() uploadDto: UploadDto) {
     const processImgId = uuidv4();
@@ -41,6 +42,7 @@ export class UploadController {
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Job;
+
     // 	TODO: add all these to a queue
     const jobs = [processImgJob, uploadDataJob];
     for (const job of jobs) {
@@ -49,27 +51,47 @@ export class UploadController {
   }
 
   private async processImage(imageBase64: string, hasPhysicalAsset: boolean) {
-    const image = await this.utilsService.processImage(imageBase64);
+    const resizedImage = await this.utilsService.processImage(imageBase64);
     const aiResponse = await this.aiService.aiProcessImage(
-      image,
+      resizedImage,
       hasPhysicalAsset,
     );
-    return { image, aiResponse };
+    return { image: imageBase64, aiResponse };
   }
 
   private async uploadData(
     uploadDTO: UploadDto,
-    resizedImage: string,
-    aiResponse: any,
+    processedResult: { image: string; aiResponse: any },
   ) {
-    const ipfsHash = await this.ipfsService.uploadFile(
-      Buffer.from(resizedImage, 'base64'),
-      this.utilsService.genRandImgName(),
+    // Fixed to correctly receive the result from processImage
+    const { image: image, aiResponse } = processedResult;
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const matches = image.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (!matches) {
+      throw new Error('Invalid base64 image format');
+    }
+    const imgName = this.utilsService.genRandImgName();
+    const format = matches[1];
+
+    const imageHash = await this.ipfsService.uploadFile(
+      Buffer.from(base64Data, 'base64'),
+      `${imgName}.${format}`,
     );
+
     const metadata = this.utilsService.generateMetadata(
       uploadDTO,
       aiResponse,
-      ipfsHash,
+      imageHash,
     );
+
+    const metadataHash = await this.ipfsService.uploadMetadata(metadata);
+    return {
+      metadataUrl: this.ipfsService.getIpfsUrl(metadataHash),
+      imageUrl: this.ipfsService.getIpfsUrl(imageHash),
+    };
   }
+  //   endregion
+
+  //   region ReassesImage
+  //   endregion
 }

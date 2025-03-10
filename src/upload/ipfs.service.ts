@@ -14,22 +14,23 @@ export class IpfsService {
     //   'IPFS_GATEWAY',
     //   'https://ipfs.io/ipfs',
     // );
-    this.ipfsGateway = 'https://ipfs.io/ipfs'
+    this.ipfsGateway = 'https://ipfs.io/ipfs';
     // this.pinningServiceUrl = this.configService.get<string>(
     //   'PINATA_API_URL',
     //   'https://api.pinata.cloud/pinning',
     // );
-    this.pinningServiceUrl = 'https://api.pinata.cloud/pinning',
-    this.pinningServiceApiKey = this.configService.get<string>(
-      'PINATA_JWT',
-      '',
-    );
+    (this.pinningServiceUrl = 'https://api.pinata.cloud/pinning'),
+      (this.pinningServiceApiKey = this.configService.get<string>(
+        'PINATA_JWT',
+        '',
+      ));
   }
 
   async uploadFile(fileBuffer: Buffer, fileName: string): Promise<string> {
     try {
       // Create form data
       const formData = new FormData();
+
       formData.append('file', fileBuffer, { filename: fileName });
 
       // Call Pinata API to pin the file
@@ -47,7 +48,7 @@ export class IpfsService {
       // Return the IPFS hash
       return response.data.IpfsHash;
     } catch (error) {
-      throw new BadRequestException(`IPFS upload failed: ${error.message}`);
+      throw new Error(`IPFS upload failed: ${error.message}`);
     }
   }
 
@@ -68,9 +69,7 @@ export class IpfsService {
       // Return the IPFS hash
       return response.data.IpfsHash;
     } catch (error) {
-      throw new BadRequestException(
-        `IPFS metadata upload failed: ${error.message}`,
-      );
+      throw new Error(`IPFS metadata upload failed: ${error.message}`);
     }
   }
 
