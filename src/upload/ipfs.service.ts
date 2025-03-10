@@ -10,15 +10,16 @@ export class IpfsService {
   private readonly pinningServiceApiKey: string;
 
   constructor(private configService: ConfigService) {
-    this.ipfsGateway = this.configService.get<string>(
-      'IPFS_GATEWAY',
-      'https://ipfs.io/ipfs',
-    );
-
-    this.pinningServiceUrl = this.configService.get<string>(
-      'PINATA_API_URL',
-      'https://api.pinata.cloud/pinning',
-    );
+    // this.ipfsGateway = this.configService.get<string>(
+    //   'IPFS_GATEWAY',
+    //   'https://ipfs.io/ipfs',
+    // );
+    this.ipfsGateway = 'https://ipfs.io/ipfs'
+    // this.pinningServiceUrl = this.configService.get<string>(
+    //   'PINATA_API_URL',
+    //   'https://api.pinata.cloud/pinning',
+    // );
+    this.pinningServiceUrl = 'https://api.pinata.cloud/pinning',
     this.pinningServiceApiKey = this.configService.get<string>(
       'PINATA_JWT',
       '',
@@ -71,5 +72,15 @@ export class IpfsService {
         `IPFS metadata upload failed: ${error.message}`,
       );
     }
+  }
+
+  getIpfsUrl(cid: string, path: string = ''): string {
+    // Remove trailing slash from gateway if exists
+    const gateway = this.ipfsGateway.endsWith('/')
+      ? this.ipfsGateway.slice(0, -1)
+      : this.ipfsGateway;
+
+    // Add path if provided
+    return path ? `${gateway}/${cid}/${path}` : `${gateway}/${cid}`;
   }
 }

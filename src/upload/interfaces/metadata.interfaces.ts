@@ -1,9 +1,9 @@
-interface Attribute {
+export interface Attribute {
   trait_type: string;
   value: any;
 }
 
-interface Metadata {
+export interface Metadata {
   title: string;
   description: string;
   url: string;

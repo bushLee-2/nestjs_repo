@@ -24,10 +24,12 @@ export class JobService {
   private async processQueue() {
     try {
       while (this.jobQueue.length > 0) {
+        // @ts-ignore
         const job: Job = this.jobQueue.shift();
         await this.processJob(job);
       }
     } catch (error) {
+      // throw new Error(error);
       //   TODO: send ws message with error here ?
     } finally {
       this.isProcessing = false;
@@ -38,7 +40,9 @@ export class JobService {
     // region Check if any of the dependecies failed
     if (job.dependsOn && job.dependsOn.length > 0) {
       for (const debJobId of job.dependsOn) {
+        // @ts-ignore
         if (this.jobMap.get(debJobId).status === JobStatus.FAILED) {
+          // TODO: Fail the entire dependecy chain and clean it ?
           job.status = JobStatus.FAILED;
           throw new Error(
             `Job ID ${debJobId} failed with status ${this.jobMap[debJobId].error}`,
@@ -53,9 +57,11 @@ export class JobService {
       job.updatedAt = new Date();
 
       // region Job dependecies
-      if (job.dependsOn && job.dependsOn.length > 0) {
+
+      if (job.dependsOn.length > 0) {
         let allDependeciesResolved: boolean = true;
         for (const debJobId of job.dependsOn) {
+          // @ts-ignore
           if (this.jobMap.get(debJobId).status !== JobStatus.COMPLETED) {
             allDependeciesResolved = false;
             break;
@@ -63,24 +69,25 @@ export class JobService {
         }
 
         if (allDependeciesResolved) {
-          const results = []
+          const results:any = [];
           for (const debJobId of job.dependsOn) {
-            let result = this.jobMap.get(debJobId).result;
+            // @ts-ignore
+            const result = this.jobMap.get(debJobId).result;
             results.push(...result);
           }
-          const jobResult = await job.fn(...job.parameters, ...results);
+          const jobResult = await job.fn(...(job.parameters || []), ...results);
           job.result = jobResult;
           job.status = JobStatus.COMPLETED;
-          this.cleanJobMap(job.id)
+          this.cleanJobMap(job.id);
         } else {
           this.jobQueue.push(job);
         }
         //   endregion
       } else {
-        job.result = await job.fn(...job.parameters);
+        job.result = await job.fn(...(job.parameters || []));
         job.status = JobStatus.COMPLETED;
         //   Delete job from map if there are no dependencies for it
-        this.cleanJobMap(job.id)
+        this.cleanJobMap(job.id);
       }
     } catch (error) {
       job.error = error.message;
@@ -99,5 +106,6 @@ export class JobService {
 
     if (toDelete) {
       this.jobMap.delete(jobToCheck);
-    }}
+    }
+  }
 }

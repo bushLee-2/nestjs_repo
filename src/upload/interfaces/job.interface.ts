@@ -8,12 +8,13 @@ export enum JobStatus {
 export class Job {
   id: string;
   fn: Function;
-  parameters?: any[];
+  parameters: any[] = [];
   status: JobStatus;
-  dependsOn?: string[];
+  dependsOn: string[]=[];
   result?: any;
   error?: string;
-  clientId: string;
+  // TODO: remove the "?"
+  clientId?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -38,56 +38,10 @@ export class AiService {
     this.height_default = parseInt(height);
   }
 
-  async resizeBase64Image(base64Img: string): Promise<string> {
-    try {
-      const matches = base64Img.match(/^data:image\/(\w+);base64,(.+)$/);
-      if (!matches) {
-        throw new BadRequestException('Invalid base64 image format');
-      }
-      const format = matches[1];
-      const buffer = Buffer.from(matches[2], 'base64');
-
-      // #region Aspect Ratio resizeing
-      const metadata = await sharp(buffer).metadata();
-      let width = this.width_default;
-      let height = this.height_default;
-
-      if (metadata.width && metadata.height) {
-        const aspectRatio = metadata.width / metadata.height;
-
-        if (aspectRatio > 1) {
-          width = this.width_default;
-          height = Math.floor(width / aspectRatio);
-
-          if (height > this.height_default) {
-            height = this.height_default;
-            width = Math.floor(height * aspectRatio);
-          }
-        } else {
-          height = this.height_default;
-          width = Math.floor(height * aspectRatio);
-
-          if (width > this.width_default) {
-            width = this.width_default;
-            height = Math.floor(width / aspectRatio);
-          }
-        }
-      }
-      //   #endregion
-
-      const resizedBuffer = await sharp(buffer)
-        .resize(width, height)
-        .toBuffer();
-
-      const resizedBase64 = `data:image/${format};base64,${resizedBuffer.toString('base64')}`;
-      return resizedBase64;
-    } catch (error) {
-      console.log(error);
-      throw new BadRequestException('Failed to Resize Image');
-    }
-  }
-
-  async aiProcessImage(base64Image: string, hasPhysicalAsset): Promise<string> {
+  public async aiProcessImage(
+    base64Image: string,
+    hasPhysicalAsset,
+  ): Promise<string> {
     try {
       const openai = new OpenAI();
       let userPrompt = '';
@@ -142,7 +96,7 @@ export class AiService {
     }
   }
 
-  async aiReassesImage(
+  public async aiReassesImage(
     base64Image: string,
     metadata: string,
     oldBase64Image: string,
