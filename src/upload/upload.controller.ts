@@ -15,19 +15,7 @@ interface IpfsUploadResult {
   imageUrl: string;
 }
 
-interface Attribute {
-  trait_type: string;
-  value: any;
-}
-
-interface Metadata {
-  title: string;
-  description: string;
-  url: string;
-  attributes: Attribute[];
-}
-
-@Controller('upload')
+@Controller('uploadz')
 export class UploadController {
   constructor(
     private readonly ipfsService: IpfsService,
@@ -213,12 +201,12 @@ export class UploadController {
         imageBuffer,
         imageName,
       );
-      let uploadDtoAttributes = this.recurseParseObj(uploadDto, [
+      const uploadDtoAttributes = this.recurseParseObj(uploadDto, [
         'title',
         'description',
         'imageBase64',
       ]);
-      let aiResponseAttributes = this.recurseParseObj(
+      const aiResponseAttributes = this.recurseParseObj(
         aiResponseObj,
         [],
         [],
@@ -230,8 +218,9 @@ export class UploadController {
       const metadata = {
         title: uploadDto.title,
         description: uploadDto.description,
-        attributes: atributes
-      }
+        url: this.ipfsService.getIpfsUrl(imageHash),
+        attributes: atributes,
+      };
 
       const metadataHash = await this.ipfsService.uploadMetadata(metadata);
 
@@ -273,7 +262,7 @@ export class UploadController {
         reassesDTO.tokenIdentifier,
       );
       // #region process the old image
-      let oldImageBase64 = await this.fetchImageAsBase64(originalUrl);
+      const oldImageBase64 = await this.fetchImageAsBase64(originalUrl);
       const oldBase64Data = oldImageBase64.replace(
         /^data:image\/\w+;base64,/,
         '',
@@ -288,14 +277,25 @@ export class UploadController {
         await this.aiService.resizeBase64Image(oldImageBase64);
       // #endregion
 
-      const unixTimestamp: number = Math.floor(Date.now() / 1000);
-      const aiResponse = await this.aiService.aiReassesImage(resizedImageBuffer, JSON.stringify(oldMetadata), oldResizedImageBuffer, unixTimestamp);
-      const aiResponseObj = JSON.parse(aiResponse)
+      const aiResponse = await this.aiService.aiReassesImage(
+        resizedImageBuffer,
+        JSON.stringify(oldMetadata),
+        oldResizedImageBuffer,
+      );
+      const aiResponseObj = JSON.parse(aiResponse);
 
-      let reassesAttributes = this.recurseParseObj(aiResponseObj, [], [], "xArtistsAI")  
-      oldMetadata.attributes = [...oldMetadata.attributes, ...reassesAttributes, {trait_type: `xArtistsAI_assessment_${unixTimestamp}_image_url`, value: this.ipfsService.getIpfsUrl(aiResponseObj.image)}]
-      console.log("Reassesed atributes\n", reassesAttributes)
-      console.log("Metadata", oldMetadata)
+      const reassesAttributes = this.recurseParseObj(
+        aiResponseObj,
+        [],
+        [],
+        'xArtistsAI',
+      );
+      oldMetadata.attributes = [
+        ...oldMetadata.attributes,
+        ...reassesAttributes,
+      ];
+      console.log('Reassesed atributes\n', reassesAttributes);
+      console.log('Metadata', oldMetadata);
 
       let randImageName = '';
       const characters =

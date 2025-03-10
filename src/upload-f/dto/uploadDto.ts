@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsNotEmpty, IsBoolean } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class UploadDto {
   @IsString()
@@ -32,6 +32,10 @@ export class UploadDto {
   @IsString()
   @IsNotEmpty()
   imageBase64: string;
+
+  @IsString()
+  @IsNotEmpty()
+  clientID: string;
 }
 
 class PhysicalAssetDetails {

@@ -2,6 +2,9 @@ import { IsNumber, IsString, IsNotEmpty, IsBoolean } from 'class-validator';
 
 export class UploadDto {
   @IsString()
+  clientId: string;
+
+  @IsString()
   @IsNotEmpty()
   title: string;
 

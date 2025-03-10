@@ -72,4 +72,14 @@ export class IpfsService {
       );
     }
   }
+
+  getIpfsUrl(cid: string, path: string = ''): string {
+    // Remove trailing slash from gateway if exists
+    const gateway = this.ipfsGateway.endsWith('/')
+      ? this.ipfsGateway.slice(0, -1)
+      : this.ipfsGateway;
+
+    // Add path if provided
+    return path ? `${gateway}/${cid}/${path}` : `${gateway}/${cid}`;
+  }
 }
