@@ -9,7 +9,7 @@
 // } from '@nestjs/websockets';
 // import { Server, Socket } from 'socket.io';
 // import { Logger } from '@nestjs/common';
-// import { Job, BatchJob } from './interfaces/job.interface';
+// import { Job } from './interfaces/job.interface';
 //
 // @WebSocketGateway({
 //   cors: {
@@ -85,16 +85,8 @@
 //     this.server.to(clientId).emit('jobUpdate', job);
 //   }
 //
-//   sendBatchJobUpdate(clientId: string, batchJob: BatchJob) {
-//     this.logger.debug(
-//       `Sending batch job update to client ${clientId} for batch job ${batchJob.id}`,
-//     );
-//     this.server.to(clientId).emit('batchJobUpdate', batchJob);
-//   }
-//
 //   // Returns if the client is currently connected
 //   isClientConnected(clientId: string): boolean {
-//     // @ts-ignore
 //     return (
 //       this.clientMap.has(clientId) && this.clientMap.get(clientId).length > 0
 //     );

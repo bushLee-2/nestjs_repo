@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as sharp from 'sharp';
 import { UploadDto } from './dto/uploadDto';
 import { Metadata, Attribute } from './interfaces/metadata.interfaces';
+import axios from 'axios';
 
 @Injectable()
 export class UtilsService {
@@ -23,7 +24,7 @@ export class UtilsService {
     );
   }
 
-  // region imageProcessing
+  // region Image Processing
   public async processImage(imageBase64: string): Promise<string> {
     try {
       const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -92,6 +93,66 @@ export class UtilsService {
     }
   }
 
+  async fetchImageAsBase64(imageUrl: string): Promise<string> {
+    try {
+      const headers = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        Accept:
+          'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Referer: new URL(imageUrl).origin,
+      };
+      const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        headers,
+      });
+
+      const base64 = Buffer.from(response.data, 'binary').toString('base64');
+      const contentType = response.headers['content-type'] || 'image/jpeg';
+
+      return `data:${contentType};base64,${base64}`;
+    } catch (error) {
+      console.log(error);
+      throw new Error('Failed to fetch old image');
+    }
+  }
+
+  async fetchNftData(
+    identifier: string,
+    baseUrl: string = 'https://devnet-api.multiversx.com/nfts',
+  ): Promise<{ oldMetadata: Metadata; originalUrl: string; rawNft: any }> {
+    try {
+      const url = `${baseUrl}/${identifier}`;
+      const response = await axios.get(url);
+
+      console.log(response.data);
+
+      if (response.status === 200 && response.data) {
+        const { attributes, media } = response.data;
+
+        const metadata = await this.getValidMetadata(attributes);
+
+        const originalUrl =
+          media && media.length > 0 ? media[0].originalUrl : null;
+
+        return {
+          oldMetadata: metadata,
+          originalUrl,
+          rawNft: response.data,
+        };
+      } else {
+        throw new Error(
+          `Failed to retrieve data or data is in unexpected format\n ${response.status}\n ${response.data}`,
+        );
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch NFT data for token\n ${identifier}: ${error.message}`,
+      );
+    }
+  }
+
   public genRandImgName(len: number = 16): string {
     let result = '';
     const characters =
@@ -135,7 +196,26 @@ export class UtilsService {
     return metadata;
   }
 
-  private recurseParseObj(
+  async getValidMetadata(attributes: string) {
+    try {
+      const metadataCid = Buffer.from(attributes, 'base64')
+        .toString('utf-8')
+        .split(';')
+        .filter((attr) => attr.startsWith('metadata'))[0]
+        .split(':')[1];
+      const metadataJsonUri = `https://ipfs.io/ipfs/${metadataCid}`;
+      const metadataJson = await fetch(metadataJsonUri).then((res) =>
+        res.json(),
+      );
+      console.log('Fetched ipfs metadata', metadataJson);
+      return metadataJson;
+    } catch (err) {
+      console.warn('Failed to fetch metadata for NFT', err);
+      return {};
+    }
+  }
+
+  public recurseParseObj(
     obj: any,
     excludeKeys: string[] = [],
     attributes: Attribute[] = [],

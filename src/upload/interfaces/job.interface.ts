@@ -17,4 +17,6 @@ export class Job {
   clientId?: string;
   createdAt: Date;
   updatedAt: Date;
+  //  TODO: add a rety limit for failed jobs ?
+  //        mark jobs that should return a websocket message
 }

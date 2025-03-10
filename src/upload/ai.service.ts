@@ -84,16 +84,15 @@ export class AiService {
     }
   }
 
-  public async aiReassesImage(
+  async aiReassesImage(
     base64Image: string,
     metadata: string,
     oldBase64Image: string,
+    unixTimestamp: number,
   ): Promise<string> {
     try {
       const openai = new OpenAI();
-      let userPrompt = '';
-      const unixTimestamp: number = Math.floor(Date.now() / 1000);
-      userPrompt = `I'm providing you with two images of the same artwork taken at different times for your expert reassessment. 
+      const userPrompt = `I'm providing you with two images of the same artwork taken at different times for your expert reassessment. 
                             Keep in mind this is the metadata that describes the old image:The first image shows the artwork as it appeared during its initial assessment on [DATE]. Here's the metadata and initial evaluation:\n ${metadata}
                             Please carefully compare these images and provide:
                                 1. A reassessment noting any changes in condition, appearance, or other relevant factors.Keep it concise and relatively short (< 100 words, less is preferred) while preserving the desired quality.

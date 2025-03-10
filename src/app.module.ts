@@ -7,7 +7,7 @@ import { AiService } from './upload/ai.service';
 import { MultiversxService } from './upload/mvx.service';
 import { UploadController } from './upload/upload.controller';
 import { UtilsService } from './upload/utils.service';
-import { JobService } from './upload/queue.service';
+import { QueueService } from './upload/queue.service';
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { JobService } from './upload/queue.service';
     IpfsService,
     AiService,
     UtilsService,
-    JobService,
+    QueueService,
     MultiversxService,
   ],
 })
