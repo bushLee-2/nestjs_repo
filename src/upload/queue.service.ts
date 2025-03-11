@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job, JobStatus } from './interfaces/job.interface';
-
+import { EventsGateway } from './events.gateway';
+// TODO: Make sure all independent jobs are eventually cleared
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
@@ -8,6 +9,8 @@ export class QueueService {
   private jobMap = new Map<string, Job>();
   private jobDependencies = new Map<string, string[]>();
   private isProcessing = false;
+
+  constructor(private readonly eventsGateway: EventsGateway) {}
 
   public async enqueueJob(job: Job): Promise<void> {
     this.jobQueue.push(job);
@@ -17,8 +20,9 @@ export class QueueService {
       this.jobDependencies.set(job.id, [...job.dependsOn]);
     }
 
-    this.logger.log('enqueueJob: ', job);
-    // TODO: send ws message that it was queued
+    this.logger.log(`enqueueJob: , ${job.id}, ${job.fn.name} ${job.clientId}`);
+    this.logger.debug(`enqueueJob: , ${job.id}, ${job.fn.name}`);
+    this.eventsGateway.sendJobUpdate(job.clientId, job);
 
     if (!this.isProcessing) {
       this.isProcessing = true;
@@ -32,31 +36,35 @@ export class QueueService {
         const job = this.jobQueue.shift();
         if (!job) continue;
 
-        this.processJob(job);
+        await this.processJob(job);
       }
     } catch (error) {
-      // TODO: send ws message with error here
       this.logger.error(
         `Error processing job queue: ${error.message}`,
         error.stack,
       );
-      throw new Error(
-        `Error processing job queue: ${error.message}`,
-        error.stack,
-      );
+      // Continue th queue
+      if (this.jobQueue.length > 0) {
+        this.processQueue()
+      }
     }
   }
 
   private async processJob(job: Job) {
     try {
-      this.logger.log(`Processing job ${job.id} (clientId: ${job.clientId})`);
+      this.logger.log(
+        `Processing job ${job.id} ${job.fn.name} (clientId: ${job.clientId})`,
+      );
       if (job.status == JobStatus.FAILED) {
+        this.eventsGateway.sendJobUpdate(job.clientId, job);
         this.logger.error(`Job failed due to ${job.error}`);
         this.cleanJobMap(job.id);
         return;
       }
+
       job.status = JobStatus.PROCESSING;
       job.updatedAt = new Date();
+      this.eventsGateway.sendJobUpdate(job.clientId, job);
 
       // region Check if any dependencies
       if (job.dependsOn && job.dependsOn.length > 0) {
@@ -100,8 +108,11 @@ export class QueueService {
           job.result = jobResult;
           job.status = JobStatus.COMPLETED;
           job.updatedAt = new Date();
+
+          this.eventsGateway.sendJobUpdate(job.clientId, job);
+
           this.logger.log(
-            `Job ${job.id} completed successfully (clientId: ${job.clientId})`,
+            `Job ${job.id} ${job.fn.name} completed successfully (clientId: ${job.clientId})`,
           );
 
           this.cleanJobMap(job.id);
@@ -110,11 +121,12 @@ export class QueueService {
             `Not all dependencies completed for job ${job.id}, re-queuing`,
           );
           this.jobQueue.push(job);
+          setImmediate(() => this.processQueue());
           return; // Return to avoid marking as complete
         }
       } else {
         this.logger.debug(
-          `Job ${job.id} has no dependencies, executing directly`,
+          `Job ${job.id}  ${job.fn.name} has no dependencies, executing directly`,
         );
         job.result = await job.fn(...(job.parameters || []));
         job.status = JobStatus.COMPLETED;
@@ -122,18 +134,19 @@ export class QueueService {
 
         // Clean up if no other jobs depend on this one
         this.cleanJobMap(job.id);
-        // TODO: Send websocket message about job completion
       }
     } catch (error) {
       job.error = error.message;
       job.status = JobStatus.FAILED;
       job.updatedAt = new Date();
+
+      this.eventsGateway.sendJobUpdate(job.clientId, job);
+
       // Mark dependent jobs as failed
       this.failDependentJobs(job.id);
       this.cleanJobMap(job.id);
 
       this.logger.error(`Job ${job.id} failed: ${error.message}`, error.stack);
-      // TODO: Send websocket message about job failure
       throw new Error(`Job ${job.id} failed: ${error.message}`, error.stack);
     } finally {
       // set the is processing flag
@@ -175,8 +188,57 @@ export class QueueService {
     }
 
     if (canDelete) {
+      this.deleteParentJobs(jobId);
       this.jobMap.delete(jobId);
       this.jobDependencies.delete(jobId);
+    }
+  }
+
+  private deleteParentJobs(dependentJobId: string) {
+    const job = this.jobMap.get(dependentJobId);
+    if (!job || !job.dependsOn || job.dependsOn.length === 0) {
+      return; // No dependencies to process
+    }
+
+    const parentJobIds = job.dependsOn;
+
+    // Process each parent job
+    for (const parentJobId of parentJobIds) {
+      let canDelete = true;
+
+      // Check if any other active job depends on this parent job
+      for (const [otherJobId, otherJob] of this.jobMap.entries()) {
+        // Skip the current dependent job we're processing
+        if (otherJobId === dependentJobId) {
+          continue;
+        }
+
+        // Skip jobs that are already completed or failed
+        if (
+          otherJob.status === JobStatus.COMPLETED ||
+          otherJob.status === JobStatus.FAILED
+        ) {
+          continue;
+        }
+
+        // If this active job depends on our parent, we can't delete the parent
+        if (otherJob.dependsOn && otherJob.dependsOn.includes(parentJobId)) {
+          canDelete = false;
+          break;
+        }
+      }
+
+      // If no other active job depends on this parent, we can delete it
+      if (canDelete) {
+        this.logger.debug(
+          `Removing parent job ${parentJobId} as no active jobs depend on it`,
+        );
+        this.jobMap.delete(parentJobId);
+        this.jobDependencies.delete(parentJobId);
+
+        // Recursively check if this parent job's dependencies can also be deleted
+        this.deleteParentJobs(parentJobId);
+      }
     }
   }
 }

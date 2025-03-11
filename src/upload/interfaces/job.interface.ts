@@ -14,9 +14,10 @@ export class Job {
   result?: any;
   error?: string;
   // TODO: remove the "?"
-  clientId?: string;
+  clientId: string;
   createdAt: Date;
   updatedAt: Date;
+  sendResponse: boolean = false;
   //  TODO: add a rety limit for failed jobs ?
   //        mark jobs that should return a websocket message
 }

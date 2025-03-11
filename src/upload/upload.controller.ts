@@ -33,6 +33,7 @@ export class UploadController {
       clientId: uploadDto.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
+      sendResponse: false,
     } as Job;
 
     const uploadDataId = uuidv4();
@@ -45,6 +46,7 @@ export class UploadController {
       clientId: uploadDto.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
+      sendResponse: true,
     } as Job;
 
     // 	TODO: add all these to a queue
@@ -52,6 +54,12 @@ export class UploadController {
     for (const job of jobs) {
       this.jobService.enqueueJob(job);
     }
+
+    return {
+      jobId: uploadDataId,
+      message:
+        'Upload process started. You will receive updates via WebSocket.',
+    };
   }
 
   private async processImage(imageBase64: string, hasPhysicalAsset: boolean) {
@@ -110,6 +118,7 @@ export class UploadController {
       clientId: reassessDTO.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
+      sendResponse: false,
     } as Job;
 
     const reassessImgsId = uuidv4();
@@ -122,6 +131,7 @@ export class UploadController {
       clientId: reassessDTO.clientID,
       createdAt: new Date(),
       updatedAt: new Date(),
+      sendResponse: true,
     } as Job;
 
     const uploadReassessId = uuidv4();
@@ -140,6 +150,12 @@ export class UploadController {
     for (const job of jobs) {
       this.jobService.enqueueJob(job);
     }
+
+    return {
+      jobId: uploadReassessId,
+      message:
+        'Reassess process started. You will receive updates via WebSocket.',
+    };
   }
 
   private async processImages(imageBase64: string, oldImageIdentifier: string) {
@@ -278,5 +294,5 @@ export class UploadController {
       imageUrl: this.ipfsService.getIpfsUrl(imageHash),
     };
   }
-  //   endregion
+  // endregion
 }

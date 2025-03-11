@@ -8,6 +8,7 @@ import { MultiversxService } from './upload/mvx.service';
 import { UploadController } from './upload/upload.controller';
 import { UtilsService } from './upload/utils.service';
 import { QueueService } from './upload/queue.service';
+import { EventsGateway } from './upload/events.gateway';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { QueueService } from './upload/queue.service';
     UtilsService,
     QueueService,
     MultiversxService,
+    EventsGateway,
   ],
 })
 export class AppModule {}

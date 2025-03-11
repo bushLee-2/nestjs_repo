@@ -171,7 +171,13 @@ export class UtilsService {
     aiResponse: any,
     imageHash: string,
   ): Metadata {
-    const aiResponseObj = JSON.parse(aiResponse);
+    // TODO: Figure out why gpt cant fking give correct json
+    let aiResponseObj = {};
+    try {
+      aiResponseObj = JSON.parse(aiResponse);
+    } catch (error) {
+      throw new Error(error.message);
+    }
     const uploadDtoAttributes = this.recurseParseObj(uploadDto, [
       'title',
       'description',
